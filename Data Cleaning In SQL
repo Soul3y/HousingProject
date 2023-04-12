@@ -1,0 +1,212 @@
+-- Hello, please find below the code I have written and the process I have followed through  to clean this data (Housing data from Nashville TN) in SQL.
+-- Thanks to Alex Freberg for his help and idea about this project.
+
+SELECT *
+FROM master.dbo.NashvilleHousing
+
+-----------------------------------------------------------------------------------------------
+-- STANDARDIZE DATE FORMAT
+
+-- We want to get rid of the '00:00:00' in the date column
+-- For some reason we cannot update directly the column in question 
+-- so we will create a new one and update that one
+
+SELECT SaleDate, CONVERT(date, SaleDate)
+FROM master.dbo.NashvilleHousing
+
+ALTER TABLE master.dbo.NashvilleHousing
+ADD SaleDateFixed Date;
+
+UPDATE master.dbo.NashvilleHousing
+SET SaleDateFixed = CONVERT(date, SaleDate)
+
+SELECT SaleDateFixed, CONVERT(date, SaleDate)
+FROM master.dbo.NashvilleHousing
+
+-----------------------------------------------------------------------------------------------
+-- POPULATE PROPERTY ADDRESS DATA
+
+SELECT *
+FROM master.dbo.NashvilleHousing
+WHERE PropertyAddress is null
+
+SELECT *
+FROM master.dbo.NashvilleHousing
+ORDER BY ParcelID
+
+-- It seems like there is duplicates of ParcelID and addresses and each time the datas for those 2 variables are identical 
+-- therefore we can reliably assume that if the ParcelID is the same, the propery address should be the same too
+-- even when the value is missing
+
+-- To solve that issue we going to join the table to itself based on the identicals ParcelIDs but we will also specify 
+-- that it is ok that the UniqueIDs are different since they were meant to be unique :
+
+SELECT a.ParcelID, a.PropertyAddress, b.ParcelID, b.PropertyAddress
+FROM master.dbo.NashvilleHousing a
+JOIN master.dbo.NashvilleHousing b
+ON a.ParcelID = b.ParcelID
+AND a.UniqueID <> b.UniqueID
+WHERE a.PropertyAddress IS NULL
+
+-- We will use the ISNULL fonction to populate the rows with NULL PropertyAddress 
+-- with a new column including the missing address
+
+SELECT a.ParcelID, a.PropertyAddress, b.ParcelID, b.PropertyAddress, ISNULL(a.PropertyAddress, b.PropertyAddress)
+FROM master.dbo.NashvilleHousing a
+JOIN master.dbo.NashvilleHousing b
+ON a.ParcelID = b.ParcelID
+AND a.[UniqueID ] <> b.[UniqueID ]
+WHERE a.PropertyAddress IS NULL
+
+UPDATE a
+SET PropertyAddress = ISNULL(a.PropertyAddress, b.PropertyAddress)
+FROM master.dbo.NashvilleHousing a
+JOIN master.dbo.NashvilleHousing b
+ON a.ParcelID = b.ParcelID
+AND a.[UniqueID ] <> b.[UniqueID ]
+WHERE a.PropertyAddress IS NULL
+
+-----------------------------------------------------------------------------------------------
+-- BREAKING OUT ADDRESSES INTO INDIVIDUAL COLUMNS (Address, City, State)
+
+SELECT PropertyAddress, OwnerAddress
+FROM master.dbo.NashvilleHousing
+
+-- Values in the Addresses columns will be much more usable if they are separated, we will use the PARSENAME function to do that
+-- however PARSENAME split strings based on perdiods not commas so we will replace the commas in the columns by periods for 
+-- PARSENAME to work. Also since PARSENAME works from the end to the start of the string we will specify its positons backwards. 
+-- (Just to have the columns in the right order)
+
+SELECT PARSENAME(REPLACE(PropertyAddress, ',', '.'),2)
+FROM master.dbo.NashvilleHousing
+
+SELECT PARSENAME(REPLACE(PropertyAddress, ',', '.'),1)
+FROM master.dbo.NashvilleHousing
+
+ALTER TABLE master.dbo.NashvilleHousing
+ADD PropertyAddressSplit Nvarchar(255);
+
+ALTER TABLE master.dbo.NashvilleHousing
+ADD PropertyCitySplit Nvarchar(255);
+
+UPDATE master.dbo.NashvilleHousing
+SET PropertyAddressSplit = PARSENAME(REPLACE(PropertyAddress, ',', '.'),2)
+
+UPDATE master.dbo.NashvilleHousing
+SET PropertyCitySplit = PARSENAME(REPLACE(PropertyAddress, ',', '.'),1)
+
+SELECT *
+FROM master.dbo.NashvilleHousing
+
+
+-- Let's do the same for the owners addresses :
+
+ALTER TABLE master.dbo.NashvilleHousing
+ADD OwnerAddressSplit Nvarchar(255);
+
+ALTER TABLE master.dbo.NashvilleHousing
+ADD OwnerCitySplit Nvarchar(255);
+
+ALTER TABLE master.dbo.NashvilleHousing
+ADD OwnerStateSplit Nvarchar(255);
+
+UPDATE master.dbo.NashvilleHousing
+SET OwnerAddressSplit = PARSENAME(REPLACE(OwnerAddress, ',', '.'),3)
+
+UPDATE master.dbo.NashvilleHousing
+SET OwnerCitySplit = PARSENAME(REPLACE(OwnerAddress, ',', '.'),2)
+
+UPDATE master.dbo.NashvilleHousing
+SET OwnerStateSplit = PARSENAME(REPLACE(OwnerAddress, ',', '.'),1)
+
+SELECT *
+FROM master.dbo.NashvilleHousing
+
+-----------------------------------------------------------------------------------------------
+-- CHANGE 'Y' AND 'N' TO 'Yes' AND 'No' IN SoldAsVacant
+
+SELECT DISTINCT(SoldAsVacant)
+FROM master.dbo.NashvilleHousing
+
+-- We can see that in the SoldAsVacant column there are 2 different ways of saying YES and 2 of saying NO
+-- We going to change it by using the CASE function so there are only two different options
+
+SELECT SoldAsVacant
+, CASE WHEN SoldAsVacant = 'Y' THEN 'Yes'
+	   WHEN SoldAsVacant = 'N' THEN 'No'
+       ELSE SoldAsVacant
+       END
+FROM master.dbo.NashvilleHousing
+
+UPDATE master.dbo.NashvilleHousing
+SET SoldAsVacant = CASE WHEN SoldAsVacant = 'Y' THEN 'Yes'
+				   WHEN SoldAsVacant = 'N' THEN 'No'
+				   ELSE SoldAsVacant
+				   END
+
+-- No need to create a new column this time UPDATE seems to work directly
+
+-----------------------------------------------------------------------------------------------
+-- REMOVE DUPLICATES
+
+-- Even though it is unusual we will try to delete rows of data that seem to be duplicates based on the fact that 
+-- their columns for ParcelID, PropertyAddress, SalePrice, SaleDate and LegalReference are the same
+-- We will create a CTE and use the function ROW NUMBER for this purpose
+
+SELECT *
+FROM master.dbo.NashvilleHousing
+
+WITH RowNumCTE AS(
+	SELECT *,
+	ROW_NUMBER() OVER (
+	PARTITION BY ParcelID,
+				 PropertyAddress,
+			     SalePrice,
+		         SaleDate,
+		         LegalReference
+				 ORDER BY 
+					UniqueID
+					) RowNum
+
+FROM master.dbo.NashvilleHousing
+--ORDER BY ParcelID
+)
+SELECT *
+FROM RowNumCTE
+WHERE RowNum > 1
+ORDER BY PropertyAddress
+
+-- We can now see all the supposed duplicates, let's do the deleting part
+
+WITH RowNumCTE AS(
+	SELECT *,
+	ROW_NUMBER() OVER (
+	PARTITION BY ParcelID,
+				 PropertyAddress,
+			     SalePrice,
+		         SaleDate,
+		         LegalReference
+				 ORDER BY 
+					UniqueID
+					) RowNum
+
+FROM master.dbo.NashvilleHousing
+)
+DELETE
+FROM RowNumCTE
+WHERE RowNum > 1
+
+-----------------------------------------------------------------------------------------------
+-- DELETE UNUSED COLUMNS
+
+-- Even though we usually avoid doing that with raw data we going to delete the columns which are now useless
+-- (OwnerAddress, TaxDistrict, PropertyAddress)
+
+SELECT *
+FROM master.dbo.NashvilleHousing
+
+ALTER TABLE master.dbo.NashvilleHousing
+DROP COLUMN OwnerAddress, PropertyAddress, TaxDistrict, SaleDate
+
+
+-- Our data is now ready for analysis !
