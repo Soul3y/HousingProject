@@ -1,5 +1,5 @@
 -- Hello, please find below the code I have written and the process I have followed through  to clean this data (Housing data from Nashville TN) in SQL.
--- Thanks to Alex Freberg for his help and idea about this project.
+
 
 SELECT *
 FROM master.dbo.NashvilleHousing
@@ -210,3 +210,5 @@ DROP COLUMN OwnerAddress, PropertyAddress, TaxDistrict, SaleDate
 
 
 -- Our data is now ready for analysis !
+
+-- Thanks to Alex Freberg for his help and idea about this project.
