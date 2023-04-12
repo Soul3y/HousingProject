@@ -1,3 +1,6 @@
+-- Hello, please find below the code I have written and the process I went through to explore covid data in SQL
+
+
 SELECT *
 FROM PortfolioProjects.dbo.CovidVaccinations
 
@@ -219,3 +222,7 @@ JOIN PortfolioProjects.dbo.CovidVaccinations AS vac
 	AND dea.date = vac.date
 WHERE dea.continent IS NOT NULL
 --ORDER BY 2,3
+
+
+
+-- Thanks to Alex Freberg for his helps and idea abouth this project
