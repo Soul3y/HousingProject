@@ -16,3 +16,5 @@ To achieve this, the raw data was processed using SQL Server and various data tr
 
 The project demonstrated proficiency in SQL Server and data transformation techniques, 
 resulting in a well-structured and cleansed dataset that is ready for further analysis and exploration.
+
+Here is a link to the raw dataset : https://www.kaggle.com/datasets/tmthyjames/nashville-housing-data
