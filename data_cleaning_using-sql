@@ -1,6 +1,3 @@
--- Hello, please find below the code I have written and the process I have followed through  to clean this data (Housing data from Nashville TN) in SQL.
-
-
 SELECT *
 FROM master.dbo.NashvilleHousing
 
